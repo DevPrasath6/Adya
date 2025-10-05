@@ -121,4 +121,5 @@ License: see `LICENSE` at the project root.
 
 ---
 
-If you would like one of the recommended next steps implemented (CI workflow, docker-compose override, or per-service env files), tell me which to prioritize and I will add the changes and push them to the repository.
+If you want, I can now implement one of the recommended next steps and push it to the repository. Tell me which one you prefer.
+2. Merge to main: build artifacts and Docker images, run integration tests, publish images to registry (GHCR/ECR), and deploy to a staging cluster.
