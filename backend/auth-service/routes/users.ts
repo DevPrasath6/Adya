@@ -80,7 +80,7 @@ router.get('/:id', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const { firstName, lastName, phoneNumber, address, preferences } = req.body;
-    
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       {
