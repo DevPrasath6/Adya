@@ -1,117 +1,203 @@
-# Smart Laundry System
+# Smart Laundry System — Advanced Developer Guide
 
-This repository contains the Smart Laundry System — a microservices-based platform with frontend (web & mobile), multiple backend services, ML/AI experiments, and infrastructure-as-code for local and cloud deployment.
+This repository implements a microservices-based platform for a smart laundry solution. It contains the web and mobile clients, multiple backend services, ML/AI experiments, digital twin assets, infrastructure as code, and helpers for CI/CD and local development.
 
-This README gives a high-level overview and quick developer setup steps to get the web frontend running and to find the main components of the project.
+Goals of this README
+- Provide a clear architecture overview and development workflow.
+- Document how to run and test the main components locally.
+- Outline CI/CD and release recommendations.
+- Provide ML reproducibility and model management guidance.
 
-## Repository layout (top-level)
+Contents
+- Architecture overview
+- Service matrix
+- Local development (frontend, backend, infra)
+- Testing strategy
+- CI/CD and release flow
+- ML/AI reproducibility
+- Troubleshooting & maintenance notes
+- Contribution and governance
 
-- `frontend/`
-	- `web/` — Vite + React + TypeScript web application (primary web UI)
-	- `mobile/` — mobile app (package.json placeholder)
-- `backend/` — microservices
-	- `api-gateway/` — gateway for routing requests
-	- `auth-service/` — authentication
-	- `laundry-service/` — core laundry business logic
-	- `lostfound-service/` — lost & found with ai-vision subfolder
-	- `notification-service/` — notifications
-	- `payment-service/` — payments and blockchain contracts
-	- `reporting-service/` — reporting and analytics
-- `ai-ml/` — ML experiments and training pipelines (federated learning, demand forecasting, matching)
-- `digital-twin/` — Azure Digital Twins + Unity simulation assets
-- `infra/` — `docker-compose.yml`, `k8s/`, `terraform/` for infra provisioning
-- `scripts/` — helper scripts (`db-migrate.sh`, `deploy.sh`, `seed-data.js`)
-- `tests/` — unit, integration, load tests
-- `docs/` — design docs, SRS, API specs
+----
 
-## Quick start — Web frontend (local dev)
+## Architecture overview
+
+High level (ASCII diagram):
+
+```
++----------------------+          +----------------------+          +----------------+
+|      Frontend (W)    | <------> |      API Gateway     | <------> | Auth Service   |
+|  (Vite + React TS)   |          | (edge routing, auth) |          +----------------+
++----------------------+          +----------------------+                 ^
+			 ^    ^                          ^      ^    ^                      (JWT/OAuth)
+			 |    |                          |      |    |                        |
+			 |    +--------------------------+      |    +---> Notification svc
+			 |                                         |
+			 |                                         +--> Laundry Service (core business rules)
+			 +----------------------------------------->  Lost&Found svc (ai vision)
+																									Payment svc (blockchain)
+																									Reporting svc
+
+```
+
+Notes
+- Each backend service is self-contained and can be run in a container.
+- `api-gateway` aggregates and proxies requests, handles routing and auth integration.
+- ML models live under `ai-ml/` and `backend/lostfound-service/ai-vision` and are run/trained with Python tooling.
+- Infrastructure as code (k8s / terraform) is under `infra/`.
+
+----
+
+## Service matrix
+
+Provide this table in the repo (or transfer to docs) describing each component:
+
+- frontend/web — Vite + React + TypeScript, Tailwind, shadcn UI (entry: `frontend/web/package.json`).
+- frontend/mobile — mobile client (check folder for platform; placeholder package.json exists).
+- backend/api-gateway — request routing and aggregation (Dockerfile present).
+- backend/auth-service — auth endpoints and token management.
+- backend/laundry-service — core domain logic for laundry bookings and lifecycle.
+- backend/lostfound-service — lost-and-found with AI-vision inference scripts.
+- backend/notification-service — pushes notifications (email/SMS/push).
+- backend/payment-service — payment flows and blockchain/hardhat contracts.
+- backend/reporting-service — analytics and reporting endpoints.
+
+----
+
+## Local development
 
 Prerequisites
+- Node.js >= 18, npm or pnpm/yarn
+- Docker & Docker Compose (for local stacks)
+- Python 3.10+ for ML tooling (optional unless working on ML)
 
-- Node.js (recommended active LTS, e.g., 18+)
-- npm (or yarn/pnpm if you prefer; the `web` project uses npm scripts)
-
-Start dev server for the web app:
+Recommended workflow
+1. Frontend quick dev
 
 ```powershell
 cd frontend\web
 npm ci
 npm run dev
+# Open http://localhost:5173
 ```
 
-Open the URL printed by Vite (usually `http://localhost:5173`). The frontend expects backend APIs to be available; for simple UI work you can still use static pages or mock APIs.
+If you need the backend APIs available, either start individual services or use Docker Compose.
 
-## Backend — overview & local dev
-
-Each backend service has its own folder under `backend/` and contains a `Dockerfile`. Many services have `src/`, `routes/`, and `models/` subfolders. To run the backend locally you can either:
-
-- Run services individually (install deps inside the service folder and run):
+2. Start backend service (individual)
 
 ```powershell
 cd backend\auth-service
 npm ci
-npm start
+npm run dev # or npm start depending on the service scripts
 ```
 
-- Or use Docker Compose for a local stack (recommended for integration testing and end-to-end flows):
+3. Start a dev stack with Docker Compose (recommended for integration)
 
 ```powershell
 cd infra
 docker-compose up --build
 ```
 
-Note: Some `package.json` files are placeholders or empty (for example `frontend/mobile`, `backend/api-gateway`). See TODOs below.
+Tips
+- Use `docker-compose -f docker-compose.yml -f docker-compose.override.yml` for local overrides (we can add an override to map volumes and enable fast dev).
+- If services have missing `package.json` or dev scripts, see the `TODOs` section — we can standardize them.
 
-## ML / AI
+----
 
-ML projects live under `ai-ml/` and `backend/lostfound-service/ai-vision`. These are Python-based (notebooks, training scripts). For reproducibility:
+## Environment variables
 
-- Add a Python virtual environment and install requirements (look for `requirements.txt` or `pyproject.toml` in the specific ML folder).
+Keep secrets out of Git. Example per-service `.env.example` files should live next to each service. At the repo root you can maintain a high-level `.env.example` for common variables.
 
-Example:
+Example minimal variables (root `.env.example` created):
 
-```powershell
-cd ai-ml\laundry-demand-forecast
-# create venv using your preferred Python version
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+- POSTGRES_URL=postgres://user:pass@db:5432/adya
+- REDIS_URL=redis://redis:6379
+- JWT_SECRET=replace_with_a_secure_secret
+
+----
+
+## Testing strategy
+
+- Unit tests: co-located with services (run `npm test` inside service folder, or `pytest` for Python projects).
+- Integration tests: use `tests/integration` and bring up a dev stack (docker-compose) in CI to run them.
+- Load tests: use `tests/load` scripts (e.g., k6 or Locust) against a deployed dev environment.
+
+CI should run unit tests and linters for each project, and run a smaller integration smoke test suite on PRs.
+
+----
+
+## CI/CD recommendations
+
+Start simple and iterate:
+
+1. Pull-request workflow (fast): lint, typecheck, unit tests for changed projects.
+2. Merge to main: build artifacts and Docker images, run integration tests, publish images to registry (GHCR/ECR), and deploy to a staging cluster.
+3. Release to production: run smoke tests, run DB migrations (with backups), and deploy.
+
+Suggested tools
+- GitHub Actions for CI
+- Build matrix per service using local `package.json` scripts
+- Image registry: GitHub Container Registry or DockerHub
+- Deployment: Helm charts or k8s manifests in `infra/k8s`
+
+----
+
+## ML/AI reproducibility
+
+Guidelines
+- Pin Python dependencies in `requirements.txt` or `pyproject.toml` in each `ai-ml` subproject.
+- Containerize training runs with a `Dockerfile` so experiments are reproducible.
+- Version models and datasets with DVC or MLflow. Store artifacts in an S3-compatible bucket.
+- Add CI checks for notebooks (nbval) or convert to tests.
+
+Example Dockerfile snippet for training
+
+```
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["python", "train.py"]
 ```
 
-## Infrastructure
+----
 
-- `infra/docker-compose.yml` provides local stack definitions.
-- `infra/k8s/` and `infra/terraform/` contain manifests and IaC for cloud deployments.
+## Troubleshooting
 
-## Testing
+- If your frontend can't reach the backend, verify `API_BASE_URL` env var and that the gateway is running.
+- For CORS issues, check gateway and backend service CORS configuration.
+- If Docker Compose fails, run `docker-compose down -v` to clear volumes and try again.
 
-The `tests/` folder contains unit, integration, and load test suites. Check each service for its own test runner and add `test` scripts to `package.json` where missing.
+----
 
-## Recommended next steps / TODOs
+## Maintenance & governance
 
-- Fill in/standardize `package.json` for root and services with missing package manifests (e.g., `frontend/mobile`, `backend/api-gateway`).
-- Add a root `package.json` to enable workspace scripts (optional: pnpm/Yarn workspaces).
-- Add CI workflows for linting, typechecking, and running unit tests (start with `frontend/web`).
-- Add `.env.example` files per service and a root `.env.example` for common vars.
-- Add CONTRIBUTING.md and per-service README files describing run/build/test steps.
-- For ML: pin python deps, add reproducible Dockerfile for training, and consider DVC/MLflow for model versioning.
+- Add Dependabot or Renovate to automate dependency updates.
+- Add a security scan step (Trivy/Clair) in CI to scan built images.
+- Add release automation (semantic-release) to tag and publish changes.
 
-## Where to find things
+----
 
-- Frontend web: `frontend/web`
-- Mobile app: `frontend/mobile` (placeholder)
-- Backend services: `backend/*`
-- Infra: `infra/docker-compose.yml`, `infra/k8s`, `infra/terraform`
-- ML: `ai-ml/*` and `backend/lostfound-service/ai-vision`
+## TODOs (short term)
 
-## Who to contact / Contribution
+1. Standardize `package.json` in services missing scripts (`frontend/mobile`, `backend/api-gateway`).
+2. Add `infra/docker-compose.override.yml` for local dev (map volumes, dev ports).
+3. Add GitHub Actions for frontend and backend CI.
+4. Add `.gitattributes` to normalize EOLs (CRLF vs LF) and optionally run a one-time normalization.
+5. Add per-service README with run/build/test commands.
 
-Please add maintainer/contact info here (GitHub usernames or team email).
+----
 
----
+## Contributing
 
-If you'd like, I can now:
-- add a GitHub Actions workflow that runs `npm ci`, `npm run lint`, and `npm run build` for `frontend/web`, or
-- create `.env.example` plus a `docker-compose.override.yml` for local dev.
+Please open an issue or PR. Follow the repository coding standards and include tests for new features. Add yourself to `MAINTAINERS.md` if you'll be responsible for a service.
 
-Tell me which of the two (CI workflow or env/compose) you'd like next and I'll implement it.
+----
+
+If you want, I will now:
+- add a `.gitattributes` to normalize line endings and re-normalize the repository, or
+- add a GitHub Actions workflow for `frontend/web` CI, or
+- create `infra/docker-compose.override.yml` and per-service `.env.example` files to improve local dev.
+
+Tell me which you want next and I'll implement it.
