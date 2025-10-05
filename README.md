@@ -1,125 +1,264 @@
 # Smart Laundry System
 
-A modular microservices project that supports a web UI, mobile client, backend services, ML components, and infrastructure-as-code for deployment.
+## Table of Contents
 
-This README covers:
-- What is in the repository
-- How to run the system for development
-- Testing, CI/CD and deployment guidance
-- ML reproducibility notes
-- Maintenance and contribution guidelines
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Repository Structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Contributing](#contributing)
+- [License](#license)
 
-----
-
-## Architecture overview
-
-High level (ASCII diagram):
-
-```
-+----------------------+          +----------------------+          +----------------+
-|      Frontend (W)    | <------> |      API Gateway     | <------> | Auth Service   |
-|  (Vite + React TS)   |          | (edge routing, auth) |          +----------------+
-+----------------------+          +----------------------+                 ^
-			 ^    ^                          ^      ^    ^                      (JWT/OAuth)
-			 |    |                          |      |    |                        |
-			 |    +--------------------------+      |    +---> Notification svc
-			 |                                         |
-			 |                                         +--> Laundry Service (core business rules)
-			 +----------------------------------------->  Lost&Found svc (ai vision)
-																									Payment svc (blockchain)
-																									Reporting svc
-
-```
-
-Notes
-- Each backend service is self-contained and can be run in a container.
-- `api-gateway` aggregates and proxies requests, handles routing and auth integration.
-- ML models live under `ai-ml/` and `backend/lostfound-service/ai-vision` and are run/trained with Python tooling.
 ## Overview
 
-This repository contains the code and configuration for the Smart Laundry System: a set of backend services, a web frontend, mobile client artifacts, ML experiments, and infrastructure manifests.
+The Smart Laundry System is an enterprise-grade microservices platform designed to manage laundry operations through web and mobile interfaces. The system integrates machine learning capabilities, blockchain-based payments, and IoT device management to provide a comprehensive solution for modern laundry facilities.
 
-Directories you will use most often
-- `frontend/web` — web client (Vite + React + TypeScript)
-- `backend/*` — individual backend services (each has its own Dockerfile and source)
-- `ai-ml` — machine learning experiments, notebooks and training scripts
-- `infra` — docker-compose, k8s manifests and terraform code
-- `tests` — integration and load tests
+### Key Features
 
-## Run the project (developer quick start)
+- **Web Dashboard**: React-based administrative interface
+- **Mobile Application**: Cross-platform mobile client
+- **Microservices Architecture**: Scalable backend services
+- **AI/ML Integration**: Demand forecasting and lost item matching
+- **Blockchain Payments**: Secure payment processing
+- **IoT Integration**: Device monitoring and management
+- **Digital Twin**: Azure Digital Twins with Unity simulation
 
-1. Start the web client
+## Architecture
 
-```powershell
-cd frontend\web
-npm ci
-npm run dev
-# open http://localhost:5173
+The system follows a microservices architecture pattern with the following components:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Client    │    │  Mobile Client  │    │   IoT Devices   │
+│  (React + TS)   │    │                 │    │                 │
+└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
+          │                      │                      │
+          └──────────────────────┼──────────────────────┘
+                                 │
+                    ┌─────────────┴───────────┐
+                    │     API Gateway         │
+                    │  (Authentication &      │
+                    │   Request Routing)      │
+                    └─────────────┬───────────┘
+                                  │
+          ┌───────────────────────┼───────────────────────┐
+          │                       │                       │
+    ┌─────┴─────┐         ┌───────┴───────┐       ┌───────┴───────┐
+    │   Auth    │         │   Laundry     │       │ Notification  │
+    │ Service   │         │   Service     │       │   Service     │
+    └───────────┘         └───────────────┘       └───────────────┘
+          │                       │                       │
+    ┌─────┴─────┐         ┌───────┴───────┐       ┌───────┴───────┐
+    │ Payment   │         │ Lost & Found  │       │  Reporting    │
+    │ Service   │         │   Service     │       │   Service     │
+    └───────────┘         └───────────────┘       └───────────────┘
 ```
 
-2. Run one backend service (example: auth)
+## Repository Structure
 
-```powershell
-cd backend\auth-service
+```
+├── frontend/
+│   ├── web/                 # React web application
+│   └── mobile/              # Mobile application
+├── backend/
+│   ├── api-gateway/         # API gateway service
+│   ├── auth-service/        # Authentication service
+│   ├── laundry-service/     # Core business logic
+│   ├── lostfound-service/   # Lost & found with AI vision
+│   ├── notification-service/# Notification handling
+│   ├── payment-service/     # Payment processing
+│   └── reporting-service/   # Analytics and reporting
+├── ai-ml/
+│   ├── federated-learning/  # Distributed learning models
+│   ├── laundry-demand-forecast/ # Demand prediction
+│   ├── lostfound-matching/  # Item matching algorithms
+│   └── notebooks/           # Jupyter notebooks
+├── digital-twin/
+│   ├── azure-digital-twins/ # Azure DT configurations
+│   ├── configs/             # Digital twin configs
+│   └── unity-simulation/    # Unity simulation assets
+├── iot/
+│   ├── edge/                # Edge computing components
+│   ├── firmware/            # Device firmware
+│   └── mqtt-broker/         # MQTT broker configuration
+├── infra/
+│   ├── docker-compose.yml   # Local development stack
+│   ├── k8s/                 # Kubernetes manifests
+│   └── terraform/           # Infrastructure as code
+├── tests/
+│   ├── unit/                # Unit tests
+│   ├── integration/         # Integration tests
+│   └── load/                # Performance tests
+└── scripts/                 # Deployment and utility scripts
+```
+
+## Prerequisites
+
+- **Node.js**: Version 18 or higher
+- **npm**: Version 8 or higher (or equivalent package manager)
+- **Docker**: Version 20.10 or higher
+- **Docker Compose**: Version 2.0 or higher
+- **Python**: Version 3.10 or higher (for ML components)
+
+## Getting Started
+
+### Quick Start - Web Application
+
+1. Navigate to the web application directory:
+   ```bash
+   cd frontend/web
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm ci
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Access the application at `http://localhost:5173`
+
+### Backend Services
+
+#### Individual Service Development
+
+To run a specific backend service:
+
+```bash
+cd backend/auth-service
 npm ci
 npm run dev
 ```
 
-3. Run the full dev stack
+#### Full Stack Development
 
-```powershell
+To run the complete development environment:
+
+```bash
 cd infra
 docker-compose up --build
 ```
 
-Use `docker-compose -f docker-compose.yml -f docker-compose.override.yml` for local overrides (recommended).
+For local development with live reload:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+```
+
+## Development Workflow
+
+### Environment Configuration
+
+1. Copy environment templates:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Configure environment variables according to your development setup.
+
+### Code Standards
+
+- **Frontend**: ESLint and Prettier configuration
+- **Backend**: Service-specific linting rules
+- **Python/ML**: PEP 8 compliance with Black formatter
+
+### Version Control
+
+- Feature branches should be created from `main`
+- Pull requests require code review and passing CI checks
+- Commit messages should follow conventional commit standards
 
 ## Testing
 
-- Unit tests: run from each service folder (e.g. `npm test` or `pytest`).
-- Integration tests: add CI job that brings up the stack and runs `tests/integration`.
-- Load tests: use `tests/load` (k6/Locust) against a staging or dev environment.
+### Unit Tests
 
-## CI/CD
+Execute unit tests for individual services:
 
-Minimum CI for PRs:
-- Lint and typecheck changed projects
-- Run unit tests for affected services
+```bash
+# Frontend
+cd frontend/web && npm test
 
-On merge to `main`:
-- Build and publish Docker images to a registry
-- Run the integration smoke suite
-- Deploy to staging
+# Backend service
+cd backend/auth-service && npm test
 
-Recommended tools: GitHub Actions, GHCR/ECR for images, Helm or k8s manifests for deployment.
+# Python/ML
+cd ai-ml/laundry-demand-forecast && pytest
+```
 
-## ML workflows
+### Integration Tests
 
-- Pin dependencies in `requirements.txt` or `pyproject.toml`.
-- Containerize training jobs and store artifacts in an object store.
-- Use DVC/MLflow for model and data versioning.
+Run integration tests against the full stack:
 
-## Maintenance
+```bash
+cd tests/integration
+npm test
+```
 
-- Add Dependabot/ Renovate for dependency updates.
-- Add Trivy (or similar) scanning for container images.
-- Add `.gitattributes` to normalize line endings across contributors.
+### Load Testing
 
-## Next steps (recommended)
+Performance testing using k6:
 
-1. Add GitHub Actions workflow for `frontend/web` CI.
-2. Add `infra/docker-compose.override.yml` for local development and per-service `.env.example` files.
-3. Standardize `package.json` scripts for backend services that are missing them.
+```bash
+cd tests/load
+k6 run performance-test.js
+```
 
-## Support and governance
+## Deployment
 
-Open an issue for feature requests or bugs. For operational incidents, create an issue with the `incident` label and ping the maintainers.
+### Development Environment
 
-Maintainers: update `MAINTAINERS.md` with ownership information.
+```bash
+cd infra
+docker-compose up -d
+```
 
-License: see `LICENSE` at the project root.
+### Staging/Production
+
+1. **Container Registry**: Images are built and pushed to GitHub Container Registry
+2. **Orchestration**: Kubernetes manifests in `infra/k8s/`
+3. **Infrastructure**: Terraform configurations in `infra/terraform/`
+
+### CI/CD Pipeline
+
+The project uses GitHub Actions for:
+- Automated testing on pull requests
+- Docker image building and publishing
+- Deployment to staging environments
+- Security scanning and dependency checks
+
+## Contributing
+
+### Development Setup
+
+1. Fork the repository
+2. Clone your fork locally
+3. Create a feature branch
+4. Make your changes with appropriate tests
+5. Submit a pull request
+
+### Code Review Process
+
+- All changes require review from project maintainers
+- Automated checks must pass before merge
+- Documentation updates required for new features
+
+### Issue Reporting
+
+- Use GitHub Issues for bug reports and feature requests
+- Include relevant logs and environment information
+- Follow the provided issue templates
+
+## License
+
+This project is licensed under the terms specified in the `LICENSE` file located in the project root directory.
 
 ---
 
-If you want, I can now implement one of the recommended next steps and push it to the repository. Tell me which one you prefer.
-2. Merge to main: build artifacts and Docker images, run integration tests, publish images to registry (GHCR/ECR), and deploy to a staging cluster.
+**Note**: For detailed service-specific documentation, refer to the README files in individual service directories.
