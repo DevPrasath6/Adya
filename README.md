@@ -1,22 +1,13 @@
-# Smart Laundry System — Advanced Developer Guide
+# Smart Laundry System
 
-This repository implements a microservices-based platform for a smart laundry solution. It contains the web and mobile clients, multiple backend services, ML/AI experiments, digital twin assets, infrastructure as code, and helpers for CI/CD and local development.
+A modular microservices project that supports a web UI, mobile client, backend services, ML components, and infrastructure-as-code for deployment.
 
-Goals of this README
-- Provide a clear architecture overview and development workflow.
-- Document how to run and test the main components locally.
-- Outline CI/CD and release recommendations.
-- Provide ML reproducibility and model management guidance.
-
-Contents
-- Architecture overview
-- Service matrix
-- Local development (frontend, backend, infra)
-- Testing strategy
-- CI/CD and release flow
-- ML/AI reproducibility
-- Troubleshooting & maintenance notes
-- Contribution and governance
+This README covers:
+- What is in the repository
+- How to run the system for development
+- Testing, CI/CD and deployment guidance
+- ML reproducibility notes
+- Maintenance and contribution guidelines
 
 ----
 
@@ -44,160 +35,91 @@ Notes
 - Each backend service is self-contained and can be run in a container.
 - `api-gateway` aggregates and proxies requests, handles routing and auth integration.
 - ML models live under `ai-ml/` and `backend/lostfound-service/ai-vision` and are run/trained with Python tooling.
-- Infrastructure as code (k8s / terraform) is under `infra/`.
+## Overview
 
-----
+This repository contains the code and configuration for the Smart Laundry System: a set of backend services, a web frontend, mobile client artifacts, ML experiments, and infrastructure manifests.
 
-## Service matrix
+Directories you will use most often
+- `frontend/web` — web client (Vite + React + TypeScript)
+- `backend/*` — individual backend services (each has its own Dockerfile and source)
+- `ai-ml` — machine learning experiments, notebooks and training scripts
+- `infra` — docker-compose, k8s manifests and terraform code
+- `tests` — integration and load tests
 
-Provide this table in the repo (or transfer to docs) describing each component:
+## Run the project (developer quick start)
 
-- frontend/web — Vite + React + TypeScript, Tailwind, shadcn UI (entry: `frontend/web/package.json`).
-- frontend/mobile — mobile client (check folder for platform; placeholder package.json exists).
-- backend/api-gateway — request routing and aggregation (Dockerfile present).
-- backend/auth-service — auth endpoints and token management.
-- backend/laundry-service — core domain logic for laundry bookings and lifecycle.
-- backend/lostfound-service — lost-and-found with AI-vision inference scripts.
-- backend/notification-service — pushes notifications (email/SMS/push).
-- backend/payment-service — payment flows and blockchain/hardhat contracts.
-- backend/reporting-service — analytics and reporting endpoints.
-
-----
-
-## Local development
-
-Prerequisites
-- Node.js >= 18, npm or pnpm/yarn
-- Docker & Docker Compose (for local stacks)
-- Python 3.10+ for ML tooling (optional unless working on ML)
-
-Recommended workflow
-1. Frontend quick dev
+1. Start the web client
 
 ```powershell
 cd frontend\web
 npm ci
 npm run dev
-# Open http://localhost:5173
+# open http://localhost:5173
 ```
 
-If you need the backend APIs available, either start individual services or use Docker Compose.
-
-2. Start backend service (individual)
+2. Run one backend service (example: auth)
 
 ```powershell
 cd backend\auth-service
 npm ci
-npm run dev # or npm start depending on the service scripts
+npm run dev
 ```
 
-3. Start a dev stack with Docker Compose (recommended for integration)
+3. Run the full dev stack
 
 ```powershell
 cd infra
 docker-compose up --build
 ```
 
-Tips
-- Use `docker-compose -f docker-compose.yml -f docker-compose.override.yml` for local overrides (we can add an override to map volumes and enable fast dev).
-- If services have missing `package.json` or dev scripts, see the `TODOs` section — we can standardize them.
+Use `docker-compose -f docker-compose.yml -f docker-compose.override.yml` for local overrides (recommended).
 
-----
+## Testing
 
-## Environment variables
+- Unit tests: run from each service folder (e.g. `npm test` or `pytest`).
+- Integration tests: add CI job that brings up the stack and runs `tests/integration`.
+- Load tests: use `tests/load` (k6/Locust) against a staging or dev environment.
 
-Keep secrets out of Git. Example per-service `.env.example` files should live next to each service. At the repo root you can maintain a high-level `.env.example` for common variables.
+## CI/CD
 
-Example minimal variables (root `.env.example` created):
+Minimum CI for PRs:
+- Lint and typecheck changed projects
+- Run unit tests for affected services
 
-- POSTGRES_URL=postgres://user:pass@db:5432/adya
-- REDIS_URL=redis://redis:6379
-- JWT_SECRET=replace_with_a_secure_secret
+On merge to `main`:
+- Build and publish Docker images to a registry
+- Run the integration smoke suite
+- Deploy to staging
 
-----
+Recommended tools: GitHub Actions, GHCR/ECR for images, Helm or k8s manifests for deployment.
 
-## Testing strategy
+## ML workflows
 
-- Unit tests: co-located with services (run `npm test` inside service folder, or `pytest` for Python projects).
-- Integration tests: use `tests/integration` and bring up a dev stack (docker-compose) in CI to run them.
-- Load tests: use `tests/load` scripts (e.g., k6 or Locust) against a deployed dev environment.
+- Pin dependencies in `requirements.txt` or `pyproject.toml`.
+- Containerize training jobs and store artifacts in an object store.
+- Use DVC/MLflow for model and data versioning.
 
-CI should run unit tests and linters for each project, and run a smaller integration smoke test suite on PRs.
+## Maintenance
 
-----
+- Add Dependabot/ Renovate for dependency updates.
+- Add Trivy (or similar) scanning for container images.
+- Add `.gitattributes` to normalize line endings across contributors.
 
-## CI/CD recommendations
+## Next steps (recommended)
 
-Start simple and iterate:
+1. Add GitHub Actions workflow for `frontend/web` CI.
+2. Add `infra/docker-compose.override.yml` for local development and per-service `.env.example` files.
+3. Standardize `package.json` scripts for backend services that are missing them.
 
-1. Pull-request workflow (fast): lint, typecheck, unit tests for changed projects.
+## Support and governance
+
+Open an issue for feature requests or bugs. For operational incidents, create an issue with the `incident` label and ping the maintainers.
+
+Maintainers: update `MAINTAINERS.md` with ownership information.
+
+License: see `LICENSE` at the project root.
+
+---
+
+If you want, I can now implement one of the recommended next steps and push it to the repository. Tell me which one you prefer.
 2. Merge to main: build artifacts and Docker images, run integration tests, publish images to registry (GHCR/ECR), and deploy to a staging cluster.
-3. Release to production: run smoke tests, run DB migrations (with backups), and deploy.
-
-Suggested tools
-- GitHub Actions for CI
-- Build matrix per service using local `package.json` scripts
-- Image registry: GitHub Container Registry or DockerHub
-- Deployment: Helm charts or k8s manifests in `infra/k8s`
-
-----
-
-## ML/AI reproducibility
-
-Guidelines
-- Pin Python dependencies in `requirements.txt` or `pyproject.toml` in each `ai-ml` subproject.
-- Containerize training runs with a `Dockerfile` so experiments are reproducible.
-- Version models and datasets with DVC or MLflow. Store artifacts in an S3-compatible bucket.
-- Add CI checks for notebooks (nbval) or convert to tests.
-
-Example Dockerfile snippet for training
-
-```
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["python", "train.py"]
-```
-
-----
-
-## Troubleshooting
-
-- If your frontend can't reach the backend, verify `API_BASE_URL` env var and that the gateway is running.
-- For CORS issues, check gateway and backend service CORS configuration.
-- If Docker Compose fails, run `docker-compose down -v` to clear volumes and try again.
-
-----
-
-## Maintenance & governance
-
-- Add Dependabot or Renovate to automate dependency updates.
-- Add a security scan step (Trivy/Clair) in CI to scan built images.
-- Add release automation (semantic-release) to tag and publish changes.
-
-----
-
-## TODOs (short term)
-
-1. Standardize `package.json` in services missing scripts (`frontend/mobile`, `backend/api-gateway`).
-2. Add `infra/docker-compose.override.yml` for local dev (map volumes, dev ports).
-3. Add GitHub Actions for frontend and backend CI.
-4. Add `.gitattributes` to normalize EOLs (CRLF vs LF) and optionally run a one-time normalization.
-5. Add per-service README with run/build/test commands.
-
-----
-
-## Contributing
-
-Please open an issue or PR. Follow the repository coding standards and include tests for new features. Add yourself to `MAINTAINERS.md` if you'll be responsible for a service.
-
-----
-
-If you want, I will now:
-- add a `.gitattributes` to normalize line endings and re-normalize the repository, or
-- add a GitHub Actions workflow for `frontend/web` CI, or
-- create `infra/docker-compose.override.yml` and per-service `.env.example` files to improve local dev.
-
-Tell me which you want next and I'll implement it.
